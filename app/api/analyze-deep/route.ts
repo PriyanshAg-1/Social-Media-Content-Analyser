@@ -7,14 +7,14 @@ export const runtime = 'nodejs';
 
 // Inline fallback (paste your OpenRouter key below if env loading fails)
 // Do NOT commit real keys. Keep this local.
-const INLINE_OPENROUTER_API_KEY = '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';
+const INLINE_OPENROUTER_API_KEY = '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';
 
 export async function POST(request: NextRequest) {
   try {
     const { extractedText, fileName, fileType } = await request.json();
     
     if (!extractedText) {
-      return NextResponse.json(
+      return NextResponse.json( 
         { error: 'No text provided for analysis' },
         { status: 400 }
       );
@@ -97,7 +97,7 @@ Format the response as JSON with these exact keys:
 
     // Retry up to 3 times on 429 rate-limit with exponential backoff
     let response: Response | null = null;
-    const models = ['deepseek/deepseek-r1-0528:free'];
+    const models = ['deepseek/deepseek-r1-0528:free','deepseek/deepseek-chat-v3.1:free'];
     let lastErrorText = '';
     for (let attempt = 0; attempt < 3; attempt++) {
       const model = models[Math.min(attempt, models.length - 1)];
@@ -148,7 +148,7 @@ Format the response as JSON with these exact keys:
     let analysis;
     try {
       analysis = JSON.parse(analysisText);
-    } catch (parseError) {
+    } catch {
       // If JSON parsing fails, return the raw text
       analysis = {
         rawAnalysis: analysisText,
@@ -178,7 +178,7 @@ Format the response as JSON with these exact keys:
       timestamp: new Date().toISOString()
     });
 
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Deep analysis error:', error);
     return NextResponse.json(
       { error: 'Failed to perform deep analysis' },

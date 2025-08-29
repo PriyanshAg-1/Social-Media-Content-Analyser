@@ -3,9 +3,11 @@
 import { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
 
+import type { AnalysisResult } from '@/types';
+
 interface FileUploadProps {
   onAnalysisStart: () => void;
-  onAnalysisComplete: (result: any) => void;
+  onAnalysisComplete: (result: AnalysisResult) => void;
 }
 
 export default function FileUpload({ onAnalysisStart, onAnalysisComplete }: FileUploadProps) {
@@ -59,7 +61,7 @@ export default function FileUpload({ onAnalysisStart, onAnalysisComplete }: File
     }, 100);
 
     try {
-      let finalResult: any = null;
+      let finalResult: AnalysisResult | null = null;
 
       // If Deep Analysis is selected, do OCR + OpenAI in one request
       if (isDeepAnalysis) {
@@ -81,7 +83,7 @@ export default function FileUpload({ onAnalysisStart, onAnalysisComplete }: File
         clearTimeout(timeoutId);
 
         if (deepFileResponse.ok) {
-          finalResult = await deepFileResponse.json();
+          finalResult = (await deepFileResponse.json()) as AnalysisResult;
         } else {
           // Fallback to two-step flow if the combined route fails
           console.warn('Combined deep analysis failed, falling back to two-step flow');
@@ -90,7 +92,7 @@ export default function FileUpload({ onAnalysisStart, onAnalysisComplete }: File
           basicForm.append('file', uploadedFile);
           const basicResp = await fetch('/api/analyze', { method: 'POST', body: basicForm });
           if (!basicResp.ok) throw new Error('Basic analysis failed');
-          const basicResult = await basicResp.json();
+          const basicResult = (await basicResp.json()) as AnalysisResult;
 
           const deepResp = await fetch('/api/analyze-deep', {
             method: 'POST',
@@ -103,8 +105,8 @@ export default function FileUpload({ onAnalysisStart, onAnalysisComplete }: File
           });
 
           if (deepResp.ok) {
-            const deepJson = await deepResp.json();
-            finalResult = { ...basicResult, deepAnalysis: deepJson.analysis };
+            const deepJson = (await deepResp.json()) as { analysis: AnalysisResult['deepAnalysis'] };
+            finalResult = { ...basicResult, deepAnalysis: deepJson.analysis } as AnalysisResult;
           } else {
             console.warn('Deep analysis fallback failed, attaching placeholder deep results');
             finalResult = {
@@ -141,12 +143,12 @@ export default function FileUpload({ onAnalysisStart, onAnalysisComplete }: File
       setUploadProgress(100);
 
       setTimeout(() => {
-        onAnalysisComplete(finalResult);
+        if (finalResult) onAnalysisComplete(finalResult);
         setIsUploading(false);
         setUploadProgress(0);
       }, 500);
-    } catch (err: any) {
-      const message = typeof err?.message === 'string' ? err.message : 'Failed to analyze file. Please try again.';
+    } catch (err: unknown) {
+      const message = typeof (err as { message?: string })?.message === 'string' ? (err as { message: string }).message : 'Failed to analyze file. Please try again.';
       setError(message);
       setIsUploading(false);
       setUploadProgress(0);

@@ -46,8 +46,9 @@ async function performOCR(imagePath: string): Promise<string> {
     }
     
     // Extract text from all parsed text regions
-    const extractedText = result.ParsedResults
-      ?.map((parsedResult: any) => parsedResult.ParsedText)
+    type ParsedResult = { ParsedText?: string };
+    const extractedText = (result.ParsedResults as ParsedResult[] | undefined)
+      ?.map((parsedResult) => parsedResult.ParsedText || '')
       ?.join(' ')
       ?.trim();
     
@@ -72,7 +73,7 @@ async function performOCR(imagePath: string): Promise<string> {
       } else {
         return "OCR processing failed, but this appears to be a large image with substantial content. Large images work well for detailed posts on LinkedIn or Facebook.";
       }
-    } catch (fallbackError) {
+    } catch {
       return "I couldn't process this image with OCR. Please ensure the image contains clear, readable text and try again.";
     }
   }

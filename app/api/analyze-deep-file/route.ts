@@ -9,7 +9,7 @@ export const runtime = 'nodejs';
 
 // Inline fallback (paste your OpenRouter key locally if env fails)
 // Do NOT commit real keys
-const INLINE_OPENROUTER_API_KEY = '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';
+const INLINE_OPENROUTER_API_KEY = 'sk-or-v1-71c0bae775acfd4b1813110693a4131b76edfaaa813dbed0159776832e8ee74bs';
 
 // OCR via OCR.space (same approach as basic route, simplified)
 async function performOCR(imagePath: string): Promise<string> {
@@ -41,7 +41,11 @@ async function performOCR(imagePath: string): Promise<string> {
     const result = await response.json();
     if (result.IsErroredOnProcessing) throw new Error(`OCR processing error: ${result.ErrorMessage}`);
 
-    const extractedText = result.ParsedResults?.map((x: any) => x.ParsedText)?.join(' ')?.trim();
+    type ParsedResult = { ParsedText?: string };
+    const extractedText = (result.ParsedResults as ParsedResult[] | undefined)
+      ?.map((x) => x.ParsedText || '')
+      ?.join(' ')
+      ?.trim();
     return extractedText && extractedText.length > 0 ? extractedText : '';
   } catch {
     return '';
@@ -140,32 +144,44 @@ export async function POST(request: NextRequest) {
     const prompt = `Analyze this social media content for deep insights and optimization:\n\nContent: "${extractedText}"\nFile: ${file.name} (${fileType})\n\nPlease provide a comprehensive analysis including:\n\n1. Content Quality (0-100)\n2. Engagement Potential (0-100)\n3. Brand Voice\n4. Target Audience\n5. Platform-Specific Recommendations (Twitter, Instagram, LinkedIn, Facebook)\n6. Hashtag Strategy (5-10)\n7. Optimal Posting Times\n8. Improvement Suggestions (3-5)\n9. Competitive Analysis\n10. ROI Potential\n\nReturn valid JSON with keys: contentQualityScore, engagementPotentialScore, brandVoice, targetAudience, platformRecommendations { twitter, instagram, linkedin, facebook }, hashtagStrategy[], optimalPostingTimes[], improvementSuggestions[], competitiveAnalysis, roiPotential.`;
 
     const oaController = new AbortController();
-    const oaTimeout = setTimeout(() => oaController.abort(), 60000);
+    const oaTimeout = setTimeout(() => oaController.abort(), 120000); // 120s timeout
     let oaRes: Response | null = null;
     let lastErrorText = '';
-    const models = ['deepseek/deepseek-r1-0528:free'];
+    const models = ['deepseek/deepseek-r1-0528:free','deepseek/deepseek-chat-v3.1:free'];
     for (let attempt = 0; attempt < 3; attempt++) {
       const model = models[Math.min(attempt, models.length - 1)];
-      oaRes = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${openrouterApiKey}`,
-          'Content-Type': 'application/json',
-          'HTTP-Referer': process.env.SITE_URL || 'http://localhost:3002',
-          'X-Title': 'Content Analyzer AI'
-        },
-        body: JSON.stringify({
-          model,
-          messages: [
-            { role: 'system', content: 'You are an expert social media content analyst and strategist.' },
-            { role: 'user', content: prompt }
-          ],
-          temperature: 0.7,
-          max_tokens: 2000,
-          response_format: { type: 'json_object' }
-        }),
-        signal: oaController.signal
-      });
+      try {
+        oaRes = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${openrouterApiKey}`,
+            'Content-Type': 'application/json',
+            'HTTP-Referer': process.env.SITE_URL || 'http://localhost:3002',
+            'X-Title': 'Content Analyzer AI'
+          },
+          body: JSON.stringify({
+            model,
+            messages: [
+              { role: 'system', content: 'You are an expert social media content analyst and strategist.' },
+              { role: 'user', content: prompt }
+            ],
+            temperature: 0.7,
+            max_tokens: 1200,
+            response_format: { type: 'json_object' }
+          }),
+          signal: oaController.signal
+        });
+      } catch (e: unknown) {
+        const name = (e as { name?: string })?.name;
+        if (name === 'AbortError') {
+          lastErrorText = 'Request timed out';
+          const delay = 800 * Math.pow(2, attempt);
+          console.warn(`OpenRouter abort timeout, retrying in ${delay}ms (attempt ${attempt + 1}/3)`);
+          await new Promise(r => setTimeout(r, delay));
+          continue;
+        }
+        throw e;
+      }
       if (oaRes.ok) break;
       lastErrorText = await oaRes.text();
       if (oaRes.status === 429) {
@@ -186,8 +202,8 @@ export async function POST(request: NextRequest) {
 
     const data = await oaRes.json();
     const analysisText = data.choices?.[0]?.message?.content as string;
-    let deepAnalysis: any;
-    try { deepAnalysis = JSON.parse(analysisText); } catch { deepAnalysis = { rawAnalysis: analysisText }; }
+    let deepAnalysis: unknown;
+    try { deepAnalysis = JSON.parse(analysisText); } catch { deepAnalysis = { rawAnalysis: analysisText } as unknown; }
 
     const basicAnalysis = analyzeContent(extractedText || '');
 
@@ -198,9 +214,9 @@ export async function POST(request: NextRequest) {
       fileType,
       fileName: file.name
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('Deep analysis combined route error:', err);
-    const message = typeof err?.message === 'string' ? err.message : 'Deep analysis failed';
+    const message = typeof (err as { message?: string })?.message === 'string' ? (err as { message: string }).message : 'Deep analysis failed';
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

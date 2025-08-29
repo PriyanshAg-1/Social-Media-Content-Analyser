@@ -1,37 +1,9 @@
 'use client';
 
 import { useState } from 'react';
+import type { AnalysisResult } from '@/types';
 
-interface ContentAnalysisProps {
-  result: {
-    extractedText: string;
-    analysis: {
-      wordCount: number;
-      characterCount: number;
-      readabilityScore: number;
-      suggestions: string[];
-    };
-    fileType: string;
-    fileName: string;
-    deepAnalysis?: {
-      contentQualityScore: number;
-      engagementPotentialScore: number;
-      brandVoice: string;
-      targetAudience: string;
-      platformRecommendations: {
-        twitter: string;
-        instagram: string;
-        linkedin: string;
-        facebook: string;
-      };
-      hashtagStrategy: string[];
-      optimalPostingTimes: string[];
-      improvementSuggestions: string[];
-      competitiveAnalysis: string;
-      roiPotential: string;
-    };
-  };
-}
+interface ContentAnalysisProps { result: AnalysisResult }
 
 export default function ContentAnalysis({ result }: ContentAnalysisProps) {
   const { extractedText, analysis, fileType, fileName } = result;
@@ -121,7 +93,7 @@ export default function ContentAnalysis({ result }: ContentAnalysisProps) {
         ].map((tab) => (
           <button
             key={tab.id}
-            onClick={() => setActiveTab(tab.id as any)}
+            onClick={() => setActiveTab(tab.id as 'overview' | 'text' | 'suggestions' | 'deep')}
             className={`
               flex-1 basis-1/2 md:basis-1/4 min-w-[140px] flex items-center justify-center space-x-2 py-3 px-4 rounded-lg font-medium transition-all duration-200
               ${activeTab === tab.id

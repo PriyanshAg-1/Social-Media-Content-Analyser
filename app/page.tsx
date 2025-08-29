@@ -3,13 +3,14 @@
 import { useState } from 'react';
 import FileUpload from '@/components/FileUpload';
 import ContentAnalysis from '@/components/ContentAnalysis';
+import type { AnalysisResult } from '@/types';
 
 export default function Home() {
-  const [analysisResult, setAnalysisResult] = useState<any>(null);
+  const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
-  const handleAnalysisComplete = (result: any) => {
+  const handleAnalysisComplete = (result: AnalysisResult) => {
     setAnalysisResult(result);
     setIsLoading(false);
     setIsAnalyzing(false);

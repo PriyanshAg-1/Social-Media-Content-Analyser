@@ -9,10 +9,10 @@ html {
 
 /* Responsive root font size for better mobile layout */
 @media (max-width: 420px) { html { font-size: 16px; } }
-@media (min-width: 421px) and (max-width: 640px) { html { font-size: 18px; } }
-@media (min-width: 641px) and (max-width: 1023px) { html { font-size: 20px; } }
-@media (min-width: 1024px) { html { font-size: 24px; } }
-@media (min-width: 1536px) { html { font-size: 28px; } }
+@media (min-width: 421px) and (max-width: 640px) { html { font-size: 17px; } }
+@media (min-width: 641px) and (max-width: 1023px) { html { font-size: 18px; } }
+@media (min-width: 1024px) and (max-width: 1535px) { html { font-size: 19px; } }
+@media (min-width: 1536px) { html { font-size: 20px; } }
 
 /* Remove focus outlines from buttons only */
 button:focus,
