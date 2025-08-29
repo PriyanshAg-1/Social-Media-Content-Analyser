@@ -3,13 +3,14 @@ import { writeFile, readFile } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { v4 as uuidv4 } from 'uuid';
+import type { DeepAnalysis } from '@/types';
 import { readFileSync } from 'fs';
 
 export const runtime = 'nodejs';
 
 // Inline fallback (paste your OpenRouter key locally if env fails)
 // Do NOT commit real keys
-const INLINE_OPENROUTER_API_KEY = 'sk-or-v1-71c0bae775acfd4b1813110693a4131b76edfaaa813dbed0159776832e8ee74bs';
+const INLINE_OPENROUTER_API_KEY = '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';
 
 // OCR via OCR.space (same approach as basic route, simplified)
 async function performOCR(imagePath: string): Promise<string> {
@@ -202,8 +203,60 @@ export async function POST(request: NextRequest) {
 
     const data = await oaRes.json();
     const analysisText = data.choices?.[0]?.message?.content as string;
-    let deepAnalysis: unknown;
-    try { deepAnalysis = JSON.parse(analysisText); } catch { deepAnalysis = { rawAnalysis: analysisText } as unknown; }
+
+    // Robust parsing and normalization
+    const tryParseJson = (text: string): unknown => {
+      try { return JSON.parse(text); } catch {}
+      const fenced = text.match(/```json\s*([\s\S]*?)\s*```/i)?.[1]
+        || text.match(/```\s*([\s\S]*?)\s*```/i)?.[1];
+      if (fenced) { try { return JSON.parse(fenced); } catch {} }
+      const first = text.indexOf('{');
+      const last = text.lastIndexOf('}');
+      if (first !== -1 && last !== -1 && last > first) {
+        const slice = text.slice(first, last + 1);
+        try { return JSON.parse(slice); } catch {}
+      }
+      return { rawAnalysis: text } as unknown;
+    };
+
+    const clamp01 = (n: number) => Math.min(100, Math.max(0, Math.round(n)));
+    const normalizeDeep = (input: unknown): DeepAnalysis => {
+      const base: DeepAnalysis = {
+        contentQualityScore: 0,
+        engagementPotentialScore: 0,
+        brandVoice: 'Unavailable',
+        targetAudience: 'Unavailable',
+        platformRecommendations: { twitter: 'Unavailable', instagram: 'Unavailable', linkedin: 'Unavailable', facebook: 'Unavailable' },
+        hashtagStrategy: [],
+        optimalPostingTimes: [],
+        improvementSuggestions: [],
+        competitiveAnalysis: 'Unavailable',
+        roiPotential: 'Unavailable'
+      };
+      const src = (typeof input === 'object' && input) ? input as Record<string, unknown> : {};
+      const num = (v: unknown) => (typeof v === 'number' ? v : (typeof v === 'string' ? Number(v) : 0));
+      const str = (v: unknown) => (typeof v === 'string' ? v : 'Unavailable');
+      const arrStr = (v: unknown) => Array.isArray(v) ? v.map(x => String(x)).filter(Boolean) : [];
+      const pr = (v: unknown) => {
+        const o = (typeof v === 'object' && v) ? v as Record<string, unknown> : {};
+        return { twitter: str(o.twitter), instagram: str(o.instagram), linkedin: str(o.linkedin), facebook: str(o.facebook) };
+      };
+      return {
+        contentQualityScore: clamp01(num(src.contentQualityScore)),
+        engagementPotentialScore: clamp01(num(src.engagementPotentialScore)),
+        brandVoice: str(src.brandVoice),
+        targetAudience: str(src.targetAudience),
+        platformRecommendations: pr(src.platformRecommendations),
+        hashtagStrategy: arrStr(src.hashtagStrategy),
+        optimalPostingTimes: arrStr(src.optimalPostingTimes),
+        improvementSuggestions: arrStr(src.improvementSuggestions),
+        competitiveAnalysis: str(src.competitiveAnalysis),
+        roiPotential: str(src.roiPotential),
+        ...(src.rawAnalysis ? { rawAnalysis: String(src.rawAnalysis) } : {})
+      };
+    };
+
+    const deepAnalysis = normalizeDeep(tryParseJson(analysisText));
 
     const basicAnalysis = analyzeContent(extractedText || '');
 

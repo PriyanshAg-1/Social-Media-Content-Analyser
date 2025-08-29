@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import FileUpload from '@/components/FileUpload';
 import ContentAnalysis from '@/components/ContentAnalysis';
 import type { AnalysisResult } from '@/types';
@@ -21,6 +21,19 @@ export default function Home() {
     setIsAnalyzing(true);
     setAnalysisResult(null);
   };
+
+  // Listen for reset event from child to allow "Analyze Another File"
+  useEffect(() => {
+    const handler = () => {
+      setAnalysisResult(null);
+      setIsLoading(false);
+      setIsAnalyzing(false);
+    };
+    document.addEventListener('reset-analysis', handler as EventListener);
+    return () => {
+      document.removeEventListener('reset-analysis', handler as EventListener);
+    };
+  }, []);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 isolate">

@@ -10,6 +10,11 @@ export default function ContentAnalysis({ result }: ContentAnalysisProps) {
   const [activeTab, setActiveTab] = useState<'overview' | 'text' | 'suggestions' | 'deep'>('overview');
 
   // Safe deep analysis defaults to avoid runtime errors when fields are missing
+  const toNumber01 = (v: unknown) => {
+    const n = typeof v === 'number' ? v : (typeof v === 'string' ? Number(v) : 0);
+    return Math.max(0, Math.min(100, Math.round(isFinite(n) ? n : 0)));
+  };
+
   const deep = result.deepAnalysis ?? {
     contentQualityScore: 0,
     engagementPotentialScore: 0,
@@ -27,6 +32,9 @@ export default function ContentAnalysis({ result }: ContentAnalysisProps) {
     competitiveAnalysis: 'Unavailable',
     roiPotential: 'Unavailable',
   };
+  // Defensive clamps in case API returns out-of-range numbers
+  deep.contentQualityScore = toNumber01(deep.contentQualityScore);
+  deep.engagementPotentialScore = toNumber01(deep.engagementPotentialScore);
 
   const getReadabilityColor = (score: number) => {
     if (score >= 80) return 'text-green-400';
@@ -366,10 +374,38 @@ export default function ContentAnalysis({ result }: ContentAnalysisProps) {
 
       {/* Action Buttons */}
       <div className="flex flex-col sm:flex-row gap-4 mt-8 pt-6 border-t border-white/20">
-        <button className="flex-1 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-300 hover:scale-105 shadow-lg">
+        <button
+          onClick={() => {
+            const report = {
+              fileName,
+              fileType,
+              generatedAt: new Date().toISOString(),
+              extractedText,
+              basicAnalysis: analysis,
+              deepAnalysis: deep,
+            };
+            const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${fileName.replace(/\.[^/.]+$/, '') || 'report'}-analysis.json`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+          }}
+          className="flex-1 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-300 hover:scale-105 shadow-lg"
+        >
           📊 Download Report
         </button>
-        <button className="flex-1 border border-purple-500/50 text-purple-400 hover:bg-purple-500/10 font-semibold py-3 px-6 rounded-xl transition-colors">
+        <button
+          onClick={() => {
+            // Soft navigation back to top and signal parent to reset by emitting a custom event
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            document.dispatchEvent(new CustomEvent('reset-analysis'));
+          }}
+          className="flex-1 border border-purple-500/50 text-purple-400 hover:bg-purple-500/10 font-semibold py-3 px-6 rounded-xl transition-colors"
+        >
           🔄 Analyze Another File
         </button>
       </div>
